@@ -365,6 +365,10 @@ importers:
 
   packages/typescript-config: {}
 
+  packages:
+    - "apps/*"
+    - "packages/*"
+
   packages/ui:
     dependencies:
       react:

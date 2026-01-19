@@ -1,135 +1,71 @@
-# Turborepo starter
+# Vendzy flash sale starter
 
-This Turborepo starter is maintained by the Turborepo core team.
+This project is a technical demonstration of a microservices-based e-commerce architecture designed to handle high-concurrency "Flash Sale" events. The primary goal is to ensure data consistency and prevent overselling when multiple users attempt to purchase limited inventory at the same millisecond.
 
-## Using this example
+## How to run the project
 
-Run the following command:
+Clone the repository to your local machine:
 
 ```sh
-npx create-turbo@latest
+git clone https://github.com/yhtiee/Vendzy-Challenge.git
 ```
 
-## What's inside?
+At the root of the project install dependencies:
 
-This Turborepo includes the following packages/apps:
-
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+```sh
+pnpm install
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Create environment variables for each service:
 
+- At the root of the project open the .env.example, copy the contents. Create a .env file at the root of the project and paste the contents you copied.
+- Open the web folder `apps/web` open the .env.example, copy the contents. Create a .env file in the web folder and paste the contents you copied.
+- Open the order-service folder `apps/order-service` open the .env.example, copy the contents. Create a .env file in the order-service folder and paste the contents you copied.
+- Open the inventory-service folder `apps/inventory-service` open the .env.example, copy the contents. Create a .env file in the inventory-service folder and paste the contents you copied.
+
+(locally):
+
+- Run the following commands from the root of the project:
+```sh
+cd apps/inventory-service
+pnpm run start:dev
+cd ..
+cd apps/order-service
+pnpm run start:dev
+cd ..
+cd apps/web
+pnpm run dev
 ```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo build --filter=docs
+- The inventory service will be running on http://localhost:3001
+- The order service will be running on http://localhost:3002
+- The web app will be running on http://localhost:3000
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+(docker):
+
+- If you don't have docker installed or setup on your system visit this link to setup docker [Docker Setup](https://www.docker.com/get-started/)
+- Run this command from the root of the project:
+```sh
+docker-compose up
 ```
+- While running `docker-compose up` you might encounter an error while starting up postgres that says that the port is already used. This means you already have postgres running on that port on your system. To solve this on windows search for services. Open the services app and search for postgress, then stop all running postgress processes
+- Then you can re-run `docker-compose up`
+- When the containers have been successfully started the frontned (client) will be running on http://localhost:3000
 
-### Develop
+## Architecture Decision Record
 
-To develop all apps and packages, run the following command:
+Project structure:
+- The project was built using turbo to create a mono-repo. Why a monorepo? Reason for choosing a monorepo is becuase I want all the services to exist in one place(repo) instead of having them across different repos this will make it easire to manage, maintain, scale and test. 
+- Frontend (client) was built using Next.js
+- Inventory Service was built using Nest.js 
+- Order Service was built using Nest.js
 
-```
-cd my-turborepo
+Database:
+- Redis: I used redis in the inventory service to manage the inventory data. Why? The goal of the project is a flash sale which mean see need fast inventory retervals and updates. With redis read and write operations are more faster that normal databases so I leverage on this speed. Another reason was it was used to manage the race condition which will be explained in the next section. 
+- Postgres: I used postgres in the order service to manage the order data/history. Why? Postgres gurrantees uncorrupted, reliable and data integrity from the start of the transaction till its completed even during a crash.
 
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev
+Race Conditions:
+- This project's goal was to tackle possible race condition occurences during the flash sale. What is a race condition? A race condition is a consition that happens when more than one operation try to change the same data at the same time. From my research I noticed the "race" shows that the outcome is dependent on which ever operation fininshes first wins. In a real world example, imagin you and your frined try to pick up a banana at the same time? Yes what happens is called a race condition because who ever picks it up first wins. But this isn't a good thing in software as it is when competitng with your friend for a banana, it can cause issues and example of an issue is imagine this flash sale product was live without the solution to handle race conditions and we had just one product, two users attempted to buy that product at the exact same time what ends up happening is that we have successful sold two products when we had only one product which is bad.
+- How did I handle the race condition?. I picked redis as the databse to manage inventory because it has inbuilt capability to handle race conditions through atomicity, I used a lua script(bundles to whole read, check and write into one single execution) to run a command to reserve a product while this is executing no other command can execute until this has finished.
 
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo dev --filter=web
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-```
-cd my-turborepo
-
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo login
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-# With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended)
-turbo link
-
-# Without [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation), use your package manager
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+Communication:
+- I went with REST because as the term implies a flash sale so I would belive we want our users to enjoy the ux of speed in placing thier orders and gettin immeditae feedback if it was successful or not (synchronous) using events would involve having to wait and get feed backs through mails. Also a personal tradeoff I made was the project is small, simple presentation of one of the ways to solve race conditions, I belive that in huge production systems event driven approavh with more advance frameworks would be much more recommended ducle to scale and maintainability.
