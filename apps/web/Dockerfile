@@ -1,29 +1,30 @@
-# Stage 1: Build
 FROM node:20-alpine AS builder
+
+RUN npm install -g pnpm
+
 WORKDIR /app
 
-COPY package*.json ./
-COPY turbo.json ./
+COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml turbo.json ./
 COPY packages/ ./packages/
+
 COPY apps/web/ ./apps/web/
 
-RUN npm install
-# We pass the env variable during build if Next.js needs to bake it in
+RUN pnpm install
+
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+RUN pnpm --filter web build
 
-RUN npx turbo build --filter=@vendyz/web...
-
-# Stage 2: Runtime
 FROM node:20-alpine AS runner
 WORKDIR /app
-ENV NODE_ENV=production
 
-# Next.js standalone mode output (optimized for Docker)
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=builder /app/apps/web/public ./apps/web/public
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder /app/apps/web/.next ./apps/web/.next
+COPY --from=builder /app/apps/web/package.json ./apps/web/package.json
+
+WORKDIR /app/apps/web
 
 EXPOSE 3000
-# Run the standalone server
-CMD ["node", "apps/web/server.js"]
+CMD ["npm", "start"]
