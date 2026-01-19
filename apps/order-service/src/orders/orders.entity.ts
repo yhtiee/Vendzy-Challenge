@@ -21,7 +21,7 @@ export class Order {
         description: 'ID of the user who placed the order',
         example: 'user_12345',
     })
-    @Column()
+    @Column({nullable: true})
     userId: string;
 
     @ApiProperty({
